@@ -40,6 +40,7 @@ def load(df: pd.DataFrame, config: AppConfig) -> int:
 
     # Préparer les données
     df_load = df[COLUMNS_ORDER].copy()
+    df_load["COMPTE"] = df_load["COMPTE"].astype(str).str.strip()
     df_load["DATE_COMPTABLE"] = pd.to_datetime(df_load["DATE_COMPTABLE"])
 
     # Remplacer NaN par None pour Oracle

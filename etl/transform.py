@@ -34,6 +34,8 @@ def transform(df_x3: pd.DataFrame, df_agirh: pd.DataFrame) -> pd.DataFrame:
     # ── Préparer les périodes mensuelles ──
     df_x3 = df_x3.copy()
     df_agirh = df_agirh.copy()
+    df_x3["ACC_0"] = df_x3["ACC_0"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    df_agirh["CODE_interne"] = df_agirh["CODE_interne"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
     df_x3["_mois"] = df_x3["ACCDAT_0"].dt.to_period("M")
     df_agirh["_mois"] = df_agirh["DT_COMPTA"].dt.to_period("M")
 
@@ -138,7 +140,7 @@ def _process_piece(
     )
 
     for _, x3_row in x3_agg.iterrows():
-        acc = int(x3_row["ACC_0"])
+        acc = str(x3_row["ACC_0"]).strip()
         montant_pere = x3_row["AMTCUR_0"]
         sens = int(x3_row["SNS_0"])
         date_comptable = x3_row["ACCDAT_0"]
@@ -219,7 +221,7 @@ def _process_piece(
 
 def _make_row(
     num_piece: str,
-    compte: int,
+    compte: str,
     sens: int,
     axe_centre: str,
     axe_entite: str,
@@ -233,7 +235,7 @@ def _make_row(
     """Construit un dict représentant une ligne de balance_analytique."""
     return {
         "NUM_PIECE": num_piece,
-        "COMPTE": compte,
+        "COMPTE": str(compte),
         "SENS": sens,
         "AXE_CENTRE": axe_centre,
         "AXE_ENTITE": axe_entite,

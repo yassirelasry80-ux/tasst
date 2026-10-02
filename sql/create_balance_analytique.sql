@@ -7,7 +7,7 @@
 CREATE TABLE balance_analytique (
     -- Colonnes Fonctionnelles
     NUM_PIECE       VARCHAR2(30)    NOT NULL,
-    COMPTE          NUMBER(8)       NOT NULL,
+    COMPTE          VARCHAR2(20)    NOT NULL,
     SENS            NUMBER(1)       NOT NULL,
     AXE_CENTRE      VARCHAR2(20),
     AXE_ENTITE      VARCHAR2(10),
