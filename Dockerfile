@@ -56,4 +56,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 6. Point d'entrée par défaut
-CMD ["python", "main.py"]
+CMD ["bash"]

@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 from etl.config import AppConfig
 from etl.connections import oracle_connection, sqlserver_connection
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ def extract_x3(config: AppConfig) -> pd.DataFrame:
     Returns:
         DataFrame avec colonnes : NUM_0, ACC_0, SNS_0, AMTCUR_0, CUR_0, ACCDAT_0
     """
-    table_name = f"{config.entite_name}gaccentryd"
+    table_name = f"{config.entite_name}.gaccentryd"
     query = f"""
         SELECT 
             NUM_0,
@@ -32,13 +33,23 @@ def extract_x3(config: AppConfig) -> pd.DataFrame:
             CUR_0,
             ACCDAT_0
         FROM {table_name}
-        WHERE ACCDAT_0 > TO_DATE(:start_date, 'YYYY-MM-DD')
+        WHERE ACCDAT_0 > :start_date
+          AND ACCDAT_0 < :end_date
           AND TYP_0 = 'ODP'
           AND LEDTYP_0 = 2
     """
 
+    start_date = config.start_date
+
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date[:10], "%d/%m/%Y")
+
+    # Borne supérieure = 1er jour du mois courant (exclure le mois en cours)
+    today = datetime.now()
+    end_date = today.replace(day=1)
+
     with oracle_connection(config.x3_oracle) as conn:
-        df = pd.read_sql(query, conn, params={"start_date": config.start_date})
+        df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
 
     logger.info(
         f"X3 — {len(df)} lignes extraites depuis {table_name} "
@@ -48,54 +59,68 @@ def extract_x3(config: AppConfig) -> pd.DataFrame:
 
 
 def extract_agirh(config: AppConfig) -> pd.DataFrame:
+    from calendar import monthrange
+
+    start_date = config.start_date
+
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(
+            start_date[:10],
+            "%d/%m/%Y"
+        )
+
+    # Générer les dates de fin de mois depuis start_date jusqu'au mois dernier (excl. mois courant)
+    today = datetime.now()
+    premier_jour_mois_courant = today.replace(day=1)
+    dates_fin_mois = []
+    current = start_date.replace(day=1)
+    while current < premier_jour_mois_courant:
+        last_day = monthrange(current.year, current.month)[1]
+        date_str = current.replace(day=last_day).strftime("%Y%m%d")
+        dates_fin_mois.append(date_str)
+        # Passer au mois suivant
+        if current.month == 12:
+            current = current.replace(year=current.year + 1, month=1)
+        else:
+            current = current.replace(month=current.month + 1)
+
+    placeholders = ",".join(["?" for _ in dates_fin_mois])
+    query = f"""
+        SELECT *
+        FROM [AGIRH_CMPG].[dbo].[COMPTA_ANALYTIQUE_CMGP_SI]
+        WHERE [DT_COMPTA] IN ({placeholders})
+          AND [CODE_interne] LIKE '6%'
     """
-    Extrait le détail analytique de paie depuis AGIRH (SQL Server).
-    
-    ⚠️  Requête à intégrer ultérieurement.
-         Filtres attendus : date comptable, journal, société.
-         Colonnes attendues : CODE_interne, ETB, SU, CODE_AGENCE, AGENCE,
-                              TYPE_ORGANISATION, INTITULE_TO, mt, debit, credit,
-                              DT_COMPTA, ste, journal, rubrique
-    
-    Returns:
-        DataFrame avec les colonnes AGIRH.
-    """
-    # ──────────────────────────────────────────────────────────
-    # TODO : Remplacer par la requête AGIRH définitive
-    # Filtres prévus : date comptable, journal (PAIE), société
-    # ──────────────────────────────────────────────────────────
-    query = """
-        -- PLACEHOLDER : requête AGIRH à intégrer ultérieurement
-        -- SELECT 
-        --     CODE_interne, ETB, SU, CODE_AGENCE, AGENCE,
-        --     TYPE_ORGANISATION, INTITULE_TO,
-        --     mt, debit, credit,
-        --     DT_COMPTA, ste, journal, rubrique
-        -- FROM ???
-        -- WHERE DT_COMPTA > @start_date
-        --   AND journal = 'PAIE'
-        --   AND ste = @entite_name
-        SELECT 1  -- placeholder, lèvera une erreur si exécuté tel quel
-    """
-    raise NotImplementedError(
-        "La requête AGIRH n'est pas encore définie. "
-        "Veuillez compléter la fonction extract_agirh() dans etl/extract.py."
+
+    logger.info(
+        f"AGIRH — Dates fin de mois recherchées ({len(dates_fin_mois)}) : {dates_fin_mois}"
     )
 
-    # Code qui sera exécuté une fois la requête définie :
-    # with sqlserver_connection(config.agirh_sqlserver) as conn:
-    #     df = pd.read_sql(query, conn, params={"start_date": config.start_date})
-    #
-    # logger.info(
-    #     f"AGIRH — {len(df)} lignes extraites "
-    #     f"(comptes : {df['CODE_interne'].nunique()}, "
-    #     f"ETB : {df['ETB'].nunique()}, "
-    #     f"agences : {df['CODE_AGENCE'].nunique()})"
-    # )
-    # return df
+    with sqlserver_connection(config.agirh_sqlserver) as conn:
+        df = pd.read_sql(
+            query,
+            conn,
+            params=dates_fin_mois
+        )
+
+    logger.info(
+        f"AGIRH — {len(df)} lignes extraites "
+        f"(comptes : {df['CODE_interne'].nunique()}, "
+        f"ETB : {df['ETB'].nunique()}, "
+        f"agences : {df['CODE_AGENCE'].nunique()})"
+    )
+
+    # Important pour transform.py
+    df["DT_COMPTA"] = pd.to_datetime(
+        df["DT_COMPTA"],
+        errors="coerce"
+    )
+
+    return df
 
 
-# ─── Fonctions de test (lecture depuis Excel) ────────────────
+
+
 
 def extract_x3_from_excel(filepath: str) -> pd.DataFrame:
     """Extrait les données X3 depuis le fichier Excel de travail (pour tests)."""

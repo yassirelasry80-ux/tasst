@@ -266,6 +266,11 @@ def _verify_equilibre(df_x3: pd.DataFrame, df_result: pd.DataFrame) -> None:
         .groupby(["NUM_PIECE", "COMPTE"], as_index=False)["MONTANT"]
         .sum()
     )
+    
+
+    # Harmoniser les types pour la jointure (str)
+    x3_totals["ACC_0"] = x3_totals["ACC_0"].astype(str).str.strip()
+    res_totals["COMPTE"] = res_totals["COMPTE"].astype(str).str.strip()
 
     # Rapprocher
     merged = pd.merge(
