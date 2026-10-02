@@ -78,7 +78,6 @@ def extract_agirh(config: AppConfig) -> pd.DataFrame:
         last_day = monthrange(current.year, current.month)[1]
         date_str = current.replace(day=last_day).strftime("%Y%m%d")
         dates_fin_mois.append(date_str)
-        # Passer au mois suivant
         if current.month == 12:
             current = current.replace(year=current.year + 1, month=1)
         else:
@@ -116,36 +115,4 @@ def extract_agirh(config: AppConfig) -> pd.DataFrame:
         errors="coerce"
     )
 
-    return df
-
-
-
-
-
-def extract_x3_from_excel(filepath: str) -> pd.DataFrame:
-    """Extrait les données X3 depuis le fichier Excel de travail (pour tests)."""
-    df = pd.read_excel(filepath, sheet_name="source X3")
-
-    # Renommer/nettoyer pour correspondre aux noms Oracle
-    cols_needed = ["NUM_0", "ACC_0", "SNS_0", "AMTCUR_0", "CUR_0", "ACCDAT_0"]
-    df = df[cols_needed].copy()
-    df["ACCDAT_0"] = pd.to_datetime(df["ACCDAT_0"])
-
-    logger.info(f"X3 (Excel) — {len(df)} lignes, pièces : {df['NUM_0'].nunique()}")
-    return df
-
-
-def extract_agirh_from_excel(filepath: str) -> pd.DataFrame:
-    """Extrait les données AGIRH depuis le fichier Excel de travail (pour tests)."""
-    df = pd.read_excel(filepath, sheet_name="source agirh")
-
-    # S'assurer des types
-    df["DT_COMPTA"] = pd.to_datetime(df["DT_COMPTA"])
-    df["CODE_interne"] = df["CODE_interne"].astype(int)
-
-    logger.info(
-        f"AGIRH (Excel) — {len(df)} lignes, "
-        f"comptes : {df['CODE_interne'].nunique()}, "
-        f"ETB : {df['ETB'].nunique()}"
-    )
     return df

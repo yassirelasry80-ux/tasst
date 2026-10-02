@@ -5,7 +5,6 @@ Mode : Full Reload (TRUNCATE + INSERT).
 
 import logging
 import pandas as pd
-from datetime import datetime
 from etl.config import AppConfig
 from etl.connections import oracle_connection
 
@@ -82,22 +81,3 @@ def load(df: pd.DataFrame, config: AppConfig) -> int:
         cursor.close()
 
     return total_inserted
-
-
-def load_to_csv(df: pd.DataFrame, output_path: str) -> int:
-    """
-    Export CSV pour validation/debug (alternatif au chargement Oracle).
-    
-    Args:
-        df: DataFrame issu de transform().
-        output_path: Chemin du fichier CSV de sortie.
-    
-    Returns:
-        Nombre de lignes exportées.
-    """
-    df_export = df[COLUMNS_ORDER].copy()
-    df_export["DATE_INSERTION"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    df_export.to_csv(output_path, index=False, encoding="utf-8-sig", sep=";")
-    logger.info(f"[OK] {len(df_export)} lignes exportées vers {output_path}")
-    return len(df_export)
